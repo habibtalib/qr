@@ -12,7 +12,9 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use SimpleSoftwareIO\QrCode\Generator;
 
@@ -40,6 +42,12 @@ class Qr extends Facade
             'eye_color_inner' => 'rgb(241, 148, 138)',
             'eye_color_outer' => 'rgb(69, 179, 157)',
             'eye_style' => 'square',
+            'correction' => 'H',
+            'percentage' => '.2',
+            'uploadOptions' => [
+                'disk' => 'public',
+                'directory' => null,
+            ],
         ];
     }
 
@@ -47,7 +55,8 @@ class Qr extends Facade
         string $statePath,
         string $optionsStatePath,
         ?string $defaultUrl = 'https://',
-        bool $showUrl = true
+        bool $showUrl = true,
+        array $uploadOptions = []
     ): array {
         return [
             TextInput::make($statePath)
@@ -64,6 +73,18 @@ class Qr extends Facade
                         ->statePath($optionsStatePath)
                         ->schema([
                             Hidden::make('type')->default('png'),
+                            Select::make('correction')
+                                ->live()
+                                ->default('H')
+                                ->label(__('Correction'))
+                                ->selectablePlaceholder(false)
+                                ->columnSpan('full')
+                                ->options([
+                                    'L' => '7%',
+                                    'M' => '15%',
+                                    'Q' => '25%',
+                                    'H' => '30%',
+                                ]),
 
                             TextInput::make('size')
                                 ->live()
@@ -188,7 +209,23 @@ class Qr extends Facade
                                 ->live()
                                 ->imageEditor()
                                 ->columnSpanFull()
+                                ->disk($uploadOptions['disk'] ?? 'public')
+                                ->directory($uploadOptions['directory'] ?? null)
                                 ->image(),
+
+                            Select::make('percentage')
+                                ->live()
+                                ->default(.2)
+                                ->label(__('Image Size'))
+                                ->visible(fn (Get $get) => $get('logo'))
+                                ->selectablePlaceholder(false)
+                                ->columnSpan('full')
+                                ->options([
+                                    '.1' => 'S',
+                                    '.2' => 'M',
+                                    '.3' => 'L',
+                                    '.4' => 'XL',
+                                ]),
                         ]),
 
                     Placeholder::make('preview')
@@ -210,6 +247,7 @@ class Qr extends Facade
     public static function output(?string $data = null, ?array $options = null): HtmlString
     {
         $maker = new Generator;
+        $size = 0.2;
 
         $options = $options ?? Qr::getDefaultOptions();
 
@@ -255,6 +293,14 @@ class Qr extends Facade
             $maker = $maker->margin($options['margin']);
         }
 
+        if (filled($options['correction'])) {
+            $maker = $maker->errorCorrection($options['correction']);
+        }
+
+        if (filled($options['percentage'])) {
+            $size = ($options['percentage']);
+        }
+
         if (filled($options['style'])) {
             $maker = $maker->style($options['style']);
         }
@@ -267,8 +313,17 @@ class Qr extends Facade
             reset($options['logo']);
             $logo = current($options['logo']);
 
-            if (filled($logo->getPathName())) {
-                $maker = $maker->merge($logo->getPathName(), .4, true);
+            if ($logo instanceof UploadedFile && filled($logo->getPathName())) {
+                $maker = $maker->merge($logo->getPathName(), $size, true);
+            } else {
+                $disk = optional($options)['uploadOptions']['disk'] ?? 'public';
+                if (Storage::disk($disk)->exists($logo)) {
+                    $maker = $maker->merge(
+                        Storage::disk($disk)->url($logo),
+                        $size,
+                        true
+                    );
+                }
             }
         }
 
