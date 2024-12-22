@@ -2,6 +2,18 @@
 
 All notable changes to `Qr` will be documented in this file
 
+## 1.1.17 - 2024-12-22
+
+### What's Changed
+
+* custom form by @do-dyco in https://github.com/lara-zeus/qr/pull/37
+
+### New Contributors
+
+* @do-dyco made their first contribution in https://github.com/lara-zeus/qr/pull/37
+
+**Full Changelog**: https://github.com/lara-zeus/qr/compare/1.1.16...1.1.17
+
 ## 1.1.16 - 2024-09-02
 
 ### What's Changed
